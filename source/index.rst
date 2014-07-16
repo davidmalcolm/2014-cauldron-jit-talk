@@ -23,7 +23,10 @@ David Malcolm <dmalcolm@redhat.com>
 What is libgccjit.so
 =====================
 
-* Experimental branch of GCC:
+* Experimental branch of GCC
+
+     Branch "dmalcolm/jit" within git
+
 * Building GCC as a shared library
 * Suitable for embedding inside other programs and libraries
 * In-process code-generation, at runtime
@@ -46,23 +49,6 @@ JIT compilation use cases:
   * FFI?
 
 * Your project?
-
-
-Status of the project
-=====================
-
-
-Examples of use
-===============
- * jittest
- * Octave
- * coconut
-
-.. * PyPy???
-
-
-Method jit vs tracing jit
-=========================
 
 
 Why a dedicated API for JIT?
@@ -395,7 +381,12 @@ What the API doesn't do
 =======================
 
 * Type inference
+
+* Escape analysis
+
 * Unboxing
+
+* Inline caching
 
 etc
 
@@ -431,7 +422,7 @@ Methods, and (optionally) operator overloading:
 
   block.add_assignment (
     /* q->discriminant =...  */
-    param_q.dereference_field (testcase.discriminant),
+    param_q.dereference_field (field_discriminant),
     /* (q->b * q->b) - (4 * q->a * q->c) */
     (q_b * q_b) - (four * q_a * q_c));
   block.end_with_return ();
@@ -473,10 +464,68 @@ See https://github.com/davidmalcolm/pygccjit:
     assert isinstance(jit_result, gccjit.Result)
 
 
+"Coconut": a JIT compiler for Python
+====================================
+
+https://github.com/davidmalcolm/coconut
+
+(not to be confused with "Unladen Swallow")
+
+Compiles CPython bytecode to machine code
+
+Uses the Python bindings to libgccjit
+
+.. nextslide::
+   :increment:
+
+.. code-block:: python
+
+  def f(a, b):
+    return a * b
+
+.. nextslide::
+   :increment:
+
+One basic block:
+
+.. image:: _static/bytecode-cfg.png
+
+.. nextslide::
+   :increment:
+
+31 basic blocks:
+
+.. image:: _static/ir-cfg.png
+   :scale: 10 %
+
+.. nextslide::
+   :increment:
+
+Status: an experiment:
+
+* Works on simple functions (not all bytecodes implemented yet)
+
+* Not a performance win
+
+  * Relinquishing fully dynamic behavior?
+
+  * Aside: "Method JIT" vs "Tracing JIT"
+
+* Has led to bug fixes in libgccjit
+
+
 Bindings for other languages?
 =============================
 
 Yes please!
+
+
+Implementation Details
+======================
+
+* It looks like a library to client code
+
+* It looks like a frontend to the rest of gcc
 
 
 How it originally worked
