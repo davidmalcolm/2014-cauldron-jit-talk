@@ -157,3 +157,5 @@ slides:
 	$(SPHINXBUILD) -b slides $(ALLSPHINXOPTS) $(BUILDDIR)/slides
 	@echo "Build finished. The HTML slides are in $(BUILDDIR)/slides."
 
+publish: slides
+	rsync -avz $(BUILDDIR)/slides/ dmalcolm@fedorapeople.org:public_html/presentations/cauldron-2014/jit/

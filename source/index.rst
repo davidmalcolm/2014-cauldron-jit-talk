@@ -33,6 +33,10 @@ What is libgccjit.so
 
 See http://gcc.gnu.org/wiki/JIT
 
+Prebuilt RPM packages available for Fedora and RHEL:
+
+  https://gcc.gnu.org/ml/jit/2014-q2/msg00009.html
+
 
 Why?
 ====
@@ -100,7 +104,7 @@ All state is hung off of context objects:
     extern void
     gcc_jit_context_release (gcc_jit_context *ctxt);
 
-Simple memory mamangent for client code
+Simple memory management for client code
 
   Everything that's created from a context is cleaned up when the
   context is released.
@@ -590,10 +594,121 @@ How it now works
 State removal: the clean way vs the hack
 ========================================
 
+.. code-block:: c++
 
-What would it take to get it merged?
-====================================
+  gcc::context::context ()
+  {
+    m_dumps = new gcc::dump_manager ();
+    m_passes = new gcc::pass_manager (this);
+  }
 
+.. nextslide::
+   :increment:
+
+Add a big mutex and...
+
+.. code-block:: c++
+
+  /* For those that want to, this function aims to clean up enough
+     state that you can call toplev::main again. */
+  void
+  toplev::finalize (void)
+  {
+    cgraph_c_finalize ();
+    cgraphbuild_c_finalize ();
+    cgraphunit_c_finalize ();
+    dwarf2out_c_finalize ();
+    /* etc */
+  }
+
+.. nextslide::
+   :increment:
+
+.. code-block:: c++
+
+  void cgraph_c_finalize (void)
+  {
+    x_cgraph_nodes_queue = NULL;
+    cgraph_n_nodes = 0;
+    cgraph_max_uid = 0;
+    cgraph_edge_max_uid = 0;
+    cgraph_global_info_ready = false;
+    cgraph_state = CGRAPH_STATE_PARSING;
+    cgraph_function_flags_ready = false;
+    /* etc */
+  }
+
+.. nextslide::
+   :increment:
+
+The testsuite for JIT now runs at the equivalent of -O3
+
+(with each test running in-process 5 times, to shake out state
+issues)
+
+
+Assembler as a shared library?
+==============================
+
+Currently the library:
+
+* writes out a ``.s`` file to a tempdir
+
+* invokes another "gcc" on it to convert it to a ``.so``
+
+* ``dlopen`` on the ``.so`` and then ``dlsym``
+
+This shows up as a significant part of the profile.
+
+I would prefer to do this all in-process.
+
+Are there shared libraries for these stages in our toolchain?
+
+OK if I factor out the spec language from the gcc harness?
+
+
+Summary
+=======
+* GCC as a shared library exists
+
+* Has been through significant testing
+
+  * 3 experimental method JITs.  No tracing JITs yet.
+
+* Has located various issues within GCC
+
+  * state management
+
+
+Next steps
+==========
+
+* Try using it in your language runtime!
+
+* Package it for more distributions
+
+* More language bindings
+
+* Implement support for a tracing JIT (PyPy?)
+
+* What would it take to get it merged for the next major GCC
+  release?
+
+
+Questions and Discussion
+========================
+
+Thanks for listening!
+
+
+
+
+.. Users of the project:
+
+   * "jittest"
+   * Octave
+   * coconut
+   * PyPy?
 
 .. The TODO.rst list
 
