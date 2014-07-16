@@ -118,6 +118,32 @@ Simple memory mamangent for client code
   context is released.
 
 
+Entities within a context
+=========================
+
+.. code-block:: c
+
+  extern const char *
+  gcc_jit_object_get_debug_string (gcc_jit_object *obj);
+
+.. nextslide::
+   :increment:
+
+.. blockdiag::
+
+  diagram {
+    gcc_jit_object <- gcc_jit_location;
+    gcc_jit_object <- gcc_jit_type;
+        gcc_jit_type <- gcc_jit_struct;
+    gcc_jit_object <- gcc_jit_field;
+    gcc_jit_object <- gcc_jit_function;
+    gcc_jit_object <- gcc_jit_block;
+    gcc_jit_object <- gcc_jit_rvalue;
+      gcc_jit_rvalue <- gcc_jit_lvalue;
+        gcc_jit_lvalue <- gcc_jit_param;
+  }
+
+
 One-time setup vs per-compile state
 ===================================
 
