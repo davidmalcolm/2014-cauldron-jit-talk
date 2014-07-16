@@ -312,11 +312,63 @@ Bindings for other languages?
 Yes please!
 
 
-Internals of how it works
-=========================
+How it originally worked
+========================
 The original way it worked:
 
-How it now works:
+.. actdiag::
+
+   diagram {
+     api_calls -> compile -> toplev_main -> parse_file -> callback -> more_api_calls;
+
+     lane client_code {
+        label = "Client code";
+        api_calls [label = "API calls"];
+        callback [label = "Callback"];
+        more_api_calls [label = "More API calls"];
+     }
+     lane jit_api {
+        label = "JIT API";
+        compile [label = "compile"];
+     }
+     lane jit_frontend {
+        label = "JIT \"Frontend\"";
+        parse_file [label = "parse_file"];
+     }
+     lane libbackend_a {
+        label = "libbackend.a";
+        toplev_main [label = "toplev_main"];
+     }
+  }
+
+How it now works
+================
+
+.. actdiag::
+
+   diagram {
+     api_calls -> recording -> compile -> toplev_main
+       -> parse_file -> playback;
+
+     lane client_code {
+        label = "Client code";
+        api_calls [label = "API calls"];
+        compile [label = "compile"];
+     }
+     lane jit_api {
+        label = "JIT API";
+        recording [label = "Recording"];
+     }
+     lane jit_frontend {
+        label = "JIT \"Frontend\"";
+        parse_file [label = "parse_file"];
+     }
+     lane libbackend_a {
+        label = "libbackend.a";
+        toplev_main [label = "toplev_main"];
+        playback [label = "playback"];
+     }
+  }
 
 
 What would it take to get it merged?
