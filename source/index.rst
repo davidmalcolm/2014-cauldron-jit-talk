@@ -56,7 +56,7 @@ Examples of use
 ===============
  * jittest
  * Octave
- * coconut?
+ * coconut
 
 .. * PyPy???
 
@@ -87,6 +87,8 @@ Design decisions
 * All types are opaque.
 
 * Support multithreaded client code
+
+* Very high-level API
 
 
 What the API looks like
@@ -126,6 +128,11 @@ Entities within a context
   extern const char *
   gcc_jit_object_get_debug_string (gcc_jit_object *obj);
 
+* Very useful for debugging
+
+* Internal note: if you call this on an object, the ``const char *``
+  has the same lifetime as the object.
+
 .. nextslide::
    :increment:
 
@@ -143,6 +150,70 @@ Entities within a context
         gcc_jit_lvalue <- gcc_jit_param;
   }
 
+Source-Code Locations
+=====================
+
+Optional, but useful to end-users
+
+.. code-block:: c
+
+  /* Use this to create locations: */
+  extern gcc_jit_location *
+  gcc_jit_context_new_location (gcc_jit_context *ctxt,
+                                const char *filename,
+                                int line,
+                                int column);
+
+  /* Need to turn on generation of debuginfo: */
+  gcc_jit_context_set_bool_option (
+    ctxt, GCC_JIT_BOOL_OPTION_DEBUGINFO, 1);
+
+
+.. nextslide::
+   :increment:
+
+We can use this to single-step through the machine code
+e.g. generated for bytecode::
+
+  (gdb) break fibonacci
+  (gdb) run
+  Breakpoint 1, fibonacci (input=8) at main.cc:43
+  43      DUP,
+  (gdb) next
+  47      PUSH_INT_CONST, 2,
+  (gdb) next
+  51      BINARY_INT_COMPARE_LT,
+  (gdb) next
+  55      JUMP_ABS_IF_TRUE, 17,
+  (gdb) next
+  59      DUP,
+  (gdb) next
+  63      PUSH_INT_CONST,  1,
+  (gdb) next
+  67      BINARY_INT_SUBTRACT,
+
+Types
+=====
+
+Access to simple C types:
+
+.. code-block:: c
+
+   gcc_jit_type *int_type =
+      gcc_jit_context_get_type (ctxt, GCC_JIT_TYPE_INT);
+
+   gcc_jit_type *double_type =
+      gcc_jit_context_get_type (ctxt, GCC_JIT_TYPE_DOUBLE);
+
+   /* etc */
+
+.. nextslide::
+   :increment:
+
+* structs
+* function pointers
+* const, volatile
+* etc
 
 One-time setup vs per-compile state
 ===================================
@@ -204,22 +275,74 @@ Solution: nested contexts:
   parent: client code should release a child context before releasing
   the parent context.
 
-Error-handling
-==============
-Inspired by OpenGL:
+Functions
+=========
 
-  * record errors
-
-  * fail if an error has occurred
-
-  * fail gracefully when called after an error
-
-Client code only has to check for errors once.
+How to generate the equivalent of:
 
 .. code-block:: c
 
-  extern const char *
-  gcc_jit_context_get_first_error (gcc_jit_context *ctxt);
+     const char *
+     test_string_literal (void)
+     {
+        return "hello world";
+     }
+
+.. nextslide::
+   :increment:
+
+.. code-block:: c
+
+  gcc_jit_type *const_char_ptr_type =
+    gcc_jit_context_get_type (ctxt, GCC_JIT_TYPE_CONST_CHAR_PTR);
+
+  /* Build the test_fn.  */
+  gcc_jit_function *test_fn =
+    gcc_jit_context_new_function (ctxt, NULL,
+                                  GCC_JIT_FUNCTION_EXPORTED,
+                                  const_char_ptr_type,
+                                  "test_string_literal",
+                                  0, NULL,
+                                  0);
+  gcc_jit_block *block = gcc_jit_function_new_block (test_fn, NULL);
+
+  gcc_jit_block_end_with_return (
+    block, NULL,
+    gcc_jit_context_new_string_literal (ctxt, "hello world"));
+
+.. nextslide::
+   :increment:
+
+Example of a conditional:
+
+.. code-block:: c
+
+  /* if (i >= n) */
+  gcc_jit_block_end_with_conditional (
+    loop_cond, NULL,
+    gcc_jit_context_new_comparison (
+       ctxt, NULL,
+       GCC_JIT_COMPARISON_GE,
+       gcc_jit_lvalue_as_rvalue (i),
+       gcc_jit_param_as_rvalue (n)),
+    after_loop,
+    loop_body);
+
+.. nextslide::
+   :increment:
+
+.. code-block:: c
+
+  /* sum += i * i */
+  gcc_jit_block_add_assignment_op (
+    loop_body, NULL,
+    sum, /* lvalue */
+    GCC_JIT_BINARY_OP_PLUS,
+    gcc_jit_context_new_binary_op ( /* rvalue */
+       ctxt, NULL,
+       GCC_JIT_BINARY_OP_MULT, the_type,
+       gcc_jit_lvalue_as_rvalue (i),
+       gcc_jit_lvalue_as_rvalue (i)));
 
 
 Comments as a first-class entity
@@ -248,6 +371,24 @@ Shouldn't affect optimization.
 Visible in dumps of initial tree and of gimple.
 
 .. I have an unfinished patch to add comments to gimple and to RTL
+
+
+Error-handling
+==============
+Inspired by OpenGL:
+
+  * record errors
+
+  * fail if an error has occurred
+
+  * fail gracefully when called after an error
+
+Client code only has to check for errors once.
+
+.. code-block:: c
+
+  extern const char *
+  gcc_jit_context_get_first_error (gcc_jit_context *ctxt);
 
 
 What the API doesn't do
@@ -397,21 +538,14 @@ How it now works
   }
 
 
-What would it take to get it merged?
-====================================
-
 State removal: the clean way vs the hack
 ========================================
 
 
-.. Interesting commits:
+What would it take to get it merged?
+====================================
 
-    https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=96b218c9a1d5f39fb649e02c0e77586b180e8516
 
 .. The TODO.rst list
 
 .. Bug list?
-
-.. FIXME:
-
-   we can't implement the macro-based Py_DECREF until we have function ptrs (to jumping through tp_dealloc)
